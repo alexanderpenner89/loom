@@ -5,6 +5,8 @@ import BpmnDiagram from './BpmnDiagram';
  * BpmnDiagram ist eine React-Komponente für die Anzeige von BPMN 2.0 Diagrammen.
  * Sie verwendet bpmn-js für das Rendering und unterstützt Interaktionen wie
  * Klick-Events auf Elemente.
+ *
+ * Das Autolayout wird automatisch angewendet, wenn das XML keine Diagramm-Informationen (DI) enthält.
  */
 const meta = {
   title: 'Components/BpmnDiagram',
@@ -14,7 +16,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Eine Komponente zur Anzeige von BPMN 2.0 Diagrammen. Unterstützt XML-Import, Zoom, Pan und Event-Handling.',
+          'Eine Komponente zur Anzeige von BPMN 2.0 Diagrammen. Unterstützt XML-Import, Zoom, Pan und Event-Handling. \\n\\n**Autolayout:** Wenn das BPMN XML keine Diagramm-Informationen (DI) enthält, wird das Layout automatisch mit yet-another-bpmn-auto-layout berechnet.',
       },
     },
   },
@@ -46,18 +48,13 @@ const meta = {
       action: 'error',
       description: 'Callback when import fails',
     },
-    autoLayout: {
-      control: 'boolean',
-      description: 'Automatically layout the diagram if it lacks DI information',
-      defaultValue: false,
-    },
   },
 } satisfies Meta<typeof BpmnDiagram>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Beispiel-BPMN XML für einen einfachen Prozess
+// Beispiel-BPMN XML für einen einfachen Prozess (mit DI)
 const simpleProcessXml = `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
                   xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
@@ -93,7 +90,7 @@ const simpleProcessXml = `<?xml version="1.0" encoding="UTF-8"?>
   </bpmndi:BPMNDiagram>
 </bpmn:definitions>`;
 
-// Beispiel-BPMN XML für einen komplexeren Prozess mit Gateway
+// Beispiel-BPMN XML für einen komplexeren Prozess mit Gateway (mit DI)
 const gatewayProcessXml = `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
                   xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
@@ -168,6 +165,7 @@ const gatewayProcessXml = `<?xml version="1.0" encoding="UTF-8"?>
 
 /**
  * Standard-Story mit einem einfachen Prozessdiagramm.
+ * Das XML enthält bereits Diagramm-Informationen (DI), daher wird kein Autolayout angewendet.
  */
 export const Default: Story = {
   args: {
@@ -179,6 +177,7 @@ export const Default: Story = {
 
 /**
  * Story mit einem Gateway-Prozess, der eine Entscheidung zeigt.
+ * Das XML enthält bereits Diagramm-Informationen (DI).
  */
 export const WithGateway: Story = {
   args: {
@@ -270,64 +269,7 @@ export const Loading: Story = {
   },
 };
 
-// BPMN XML ohne DI-Informationen (für Auto-Layout-Test)
-const xmlWithoutDi = `<?xml version="1.0" encoding="UTF-8"?>
-<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
-                  targetNamespace="http://bpmn.io/schema/bpmn">
-  <bpmn:process id="Process_1" isExecutable="false">
-    <bpmn:startEvent id="StartEvent_1" name="Order Received"/>
-    <bpmn:task id="Task_1" name="Validate Order"/>
-    <bpmn:task id="Task_2" name="Process Payment"/>
-    <bpmn:task id="Task_3" name="Ship Order"/>
-    <bpmn:endEvent id="EndEvent_1" name="Complete"/>
-    <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Task_1"/>
-    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_1" targetRef="Task_2"/>
-    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_2" targetRef="Task_3"/>
-    <bpmn:sequenceFlow id="Flow_4" sourceRef="Task_3" targetRef="EndEvent_1"/>
-  </bpmn:process>
-</bpmn:definitions>`;
-
-/**
- * Story mit automatischem Layout (XML ohne DI-Informationen).
- * Verwendet yet-another-bpmn-auto-layout um automatisch Positionen zu berechnen.
- */
-export const WithAutoLayout: Story = {
-  args: {
-    xml: xmlWithoutDi,
-    height: '500px',
-    width: '800px',
-    autoLayout: true,
-  },
-  parameters: {
-    docs: {
-      description: {
-        story: 'Demonstration der automatischen Layout-Funktion. Das XML enthält keine Diagramm-Informationen (DI), daher wird das Layout automatisch mit yet-another-bpmn-auto-layout berechnet.',
-      },
-    },
-  },
-};
-
-/**
- * Story ohne Auto-Layout (XML ohne DI-Informationen).
- * Zeigt wie das Diagramm ohne Layout-Informationen aussieht.
- */
-export const WithoutAutoLayout: Story = {
-  args: {
-    xml: xmlWithoutDi,
-    height: '500px',
-    width: '800px',
-    autoLayout: false,
-  },
-  parameters: {
-    docs: {
-      description: {
-        story: 'Zeigt das gleiche XML ohne automatisches Layout. Ohne DI-Informationen können die Elemente nicht korrekt positioniert werden.',
-      },
-    },
-  },
-};
-
-// BPMN XML ohne Diagramminformationen (DI) - für Auto-Layout Demo
+// BPMN XML ohne Diagramminformationen (DI) - demonstriert automatisches Autolayout
 const xmlWithoutDi = `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
                   targetNamespace="http://bpmn.io/schema/bpmn">
@@ -351,38 +293,20 @@ const xmlWithoutDi = `<?xml version="1.0" encoding="UTF-8"?>
 </bpmn:definitions>`;
 
 /**
- * Story mit Auto-Layout - BPMN XML ohne Diagramminformationen wird automatisch angeordnet.
+ * Story mit automatischem Layout - BPMN XML ohne DI wird automatisch angeordnet.
+ * Die Komponente erkennt automatisch, dass das XML keine Diagramm-Informationen enthält
+ * und wendet yet-another-bpmn-auto-layout an.
  */
-export const WithAutoLayout: Story = {
+export const AutoLayoutApplied: Story = {
   args: {
     xml: xmlWithoutDi,
     height: '600px',
     width: '1000px',
-    autoLayout: true,
   },
   parameters: {
     docs: {
       description: {
-        story: 'Verwendet yet-another-bpmn-auto-layout um ein BPMN-Diagramm ohne vorhandene Diagramminformationen (DI) automatisch anzuordnen.',
-      },
-    },
-  },
-};
-
-/**
- * Story ohne Auto-Layout - zeigt wie XML ohne DI ohne Layout aussieht.
- */
-export const WithoutAutoLayout: Story = {
-  args: {
-    xml: xmlWithoutDi,
-    height: '600px',
-    width: '1000px',
-    autoLayout: false,
-  },
-  parameters: {
-    docs: {
-      description: {
-        story: 'Zeigt das gleiche XML ohne DI, aber ohne Auto-Layout. Die Elemente werden überlappend dargestellt oder möglicherweise nicht korrekt positioniert.',
+        story: 'Dieses XML enthält keine Diagramm-Informationen (DI). Die Komponente erkennt dies automatisch und wendet yet-another-bpmn-auto-layout an, um ein gut strukturiertes Layout zu erzeugen.',
       },
     },
   },

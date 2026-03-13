@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import BpmnJS from 'bpmn-js/lib/Viewer';
+import { BpmnModdle } from 'bpmn-moddle';
 import { layoutProcess } from 'yet-another-bpmn-auto-layout';
 import 'bpmn-js/dist/assets/diagram-js.css';
 import 'bpmn-js/dist/assets/bpmn-js.css';
@@ -20,8 +21,6 @@ interface BpmnDiagramProps {
   onError?: (error: Error) => void;
   /** Additional CSS class */
   className?: string;
-  /** Whether to automatically layout the diagram if it lacks DI information */
-  autoLayout?: boolean;
 }
 
 const defaultBpmnXml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -67,7 +66,6 @@ export default function BpmnDiagram({
   onRender,
   onError,
   className,
-  autoLayout = false,
 }: BpmnDiagramProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<BpmnJS | null>(null);
@@ -93,16 +91,51 @@ export default function BpmnDiagram({
       });
     }
 
+    // Check if XML contains DI (diagram interchange) information
+    const hasDiInfo = (xmlString: string): boolean => {
+      return xmlString.includes('bpmndi:') || xmlString.includes('BPMNDiagram');
+    };
+
     // Import XML
     const importDiagram = async () => {
       try {
         setIsLoading(true);
         setError(null);
 
-        // Apply auto-layout if enabled
+        // Auto-layout if the XML lacks DI information
         let processedXml = xml;
-        if (autoLayout) {
-          processedXml = await layoutProcess(xml);
+        if (!hasDiInfo(xml)) {
+          try {
+            // yet-another-bpmn-auto-layout requires .outgoing/.incoming arrays on
+            // flow nodes, but bpmn-moddle only sets them when the XML has explicit
+            // <bpmn:outgoing> child elements. Pre-process to add those from
+            // sourceRef/targetRef before running layout.
+            const moddle = new BpmnModdle();
+            const { rootElement } = await moddle.fromXML(xml);
+            const processes: any[] = rootElement.get('rootElements').filter(
+              (el: any) => el.$type === 'bpmn:Process'
+            );
+            for (const process of processes) {
+              const flows: any[] = (process.get('flowElements') || []).filter(
+                (el: any) => el.$type === 'bpmn:SequenceFlow'
+              );
+              for (const flow of flows) {
+                if (flow.sourceRef) {
+                  if (!flow.sourceRef.outgoing) flow.sourceRef.outgoing = [];
+                  if (!flow.sourceRef.outgoing.includes(flow)) flow.sourceRef.outgoing.push(flow);
+                }
+                if (flow.targetRef) {
+                  if (!flow.targetRef.incoming) flow.targetRef.incoming = [];
+                  if (!flow.targetRef.incoming.includes(flow)) flow.targetRef.incoming.push(flow);
+                }
+              }
+            }
+            const { xml: enrichedXml } = await moddle.toXML(rootElement, { format: true });
+            processedXml = await layoutProcess(enrichedXml);
+          } catch (layoutErr) {
+            console.warn('Auto-layout failed, using original XML:', layoutErr);
+            processedXml = xml;
+          }
         }
 
         const { warnings } = await viewer.importXML(processedXml);
@@ -134,7 +167,7 @@ export default function BpmnDiagram({
     return () => {
       viewer.destroy();
     };
-  }, [xml, height, width, onElementClick, onRender, onError, autoLayout]);
+  }, [xml, height, width, onElementClick, onRender, onError]);
 
   const containerStyle: React.CSSProperties = {
     width,
