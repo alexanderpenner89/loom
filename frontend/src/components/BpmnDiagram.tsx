@@ -104,6 +104,7 @@ export default function BpmnDiagram({
   const [error, setError] = useState<string | null>(null);
   const [processedXml, setProcessedXml] = useState<string | null>(null);
   const [isLayouting, setIsLayouting] = useState(false);
+  const [autoLayoutApplied, setAutoLayoutApplied] = useState(false);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -132,16 +133,21 @@ export default function BpmnDiagram({
         setProcessedXml(null);
 
         let finalXml = xml;
+        setAutoLayoutApplied(false);
         if (!hasDiInfo(xml)) {
           try {
             finalXml = await applyAutoLayout(xml);
+            setAutoLayoutApplied(true);
           } catch (layoutErr) {
             console.warn('Auto-layout failed, using original XML:', layoutErr);
           }
         }
 
         const { warnings } = await viewer.importXML(finalXml);
-        if (warnings.length) console.warn('BPMN Import warnings:', warnings);
+        if (warnings.length) {
+          console.warn('BPMN Import warnings:', warnings);
+          onError?.(new Error(`BPMN import warnings: ${warnings.map((w: any) => w.message || w).join('; ')}`));
+        }
 
         const canvas = viewer.get('canvas') as any;
         canvas.zoom('fit-viewport', 'auto');
@@ -166,16 +172,25 @@ export default function BpmnDiagram({
   }, [xml, height, width, onElementClick, onRender, onError]);
 
   const handleAutoLayout = async () => {
+    if (autoLayoutApplied && processedXml && processedXml !== xml) {
+      console.info('Auto-layout already applied; skipping re-run');
+      return;
+    }
     if (!viewerRef.current) return;
     setIsLayouting(true);
     try {
       const result = await applyAutoLayout(processedXml ?? xml);
       if (!viewerRef.current) return;
-      await viewerRef.current.importXML(result);
+      const { warnings } = await viewerRef.current.importXML(result);
+      if (warnings.length) {
+        console.warn('BPMN Import warnings after auto-layout:', warnings);
+        onError?.(new Error(`BPMN import warnings: ${warnings.map((w: any) => w.message || w).join('; ')}`));
+      }
       if (!viewerRef.current) return;
       const canvas = viewerRef.current.get('canvas') as any;
       canvas.zoom('fit-viewport', 'auto');
       setProcessedXml(result);
+      setAutoLayoutApplied(true);
     } catch (err) {
       console.warn('Auto-layout failed:', err);
     } finally {
@@ -242,9 +257,15 @@ export default function BpmnDiagram({
             padding: '4px',
           }}
         >
+          {(() => {
+            const autoLayoutDisabled =
+              isLayouting ||
+              isLoading ||
+              (autoLayoutApplied && !!processedXml && processedXml !== xml);
+            return (
           <button
             onClick={handleAutoLayout}
-            disabled={isLayouting || isLoading}
+            disabled={autoLayoutDisabled}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -252,8 +273,8 @@ export default function BpmnDiagram({
               padding: '6px 12px',
               border: '1px solid #e0e0e0',
               borderRadius: '4px',
-              background: isLayouting || isLoading ? '#f5f5f5' : 'white',
-              cursor: isLayouting || isLoading ? 'not-allowed' : 'pointer',
+              background: autoLayoutDisabled ? '#f5f5f5' : 'white',
+              cursor: autoLayoutDisabled ? 'not-allowed' : 'pointer',
               fontSize: '13px',
               color: '#333',
               fontFamily: 'system-ui, sans-serif',
@@ -261,6 +282,26 @@ export default function BpmnDiagram({
           >
             {isLayouting ? '⏳ Layouting…' : '↻ Auto Layout'}
           </button>
+            );
+          })()}
+        </div>
+      )}
+      {(isLayouting || (isLoading && showToolbar)) && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'rgba(255,255,255,0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 20,
+            fontFamily: 'system-ui, sans-serif',
+            color: '#444',
+            fontSize: '14px',
+          }}
+        >
+          {isLayouting ? 'Auto-layout läuft…' : 'Lade Diagramm…'}
         </div>
       )}
       <div
