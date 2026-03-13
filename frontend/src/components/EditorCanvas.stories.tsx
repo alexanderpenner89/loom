@@ -32,8 +32,11 @@ export const KIModus: Story = {
 /** Manueller Canvas – leere Arbeitsfläche */
 export const ManuellerCanvas: Story = {
   args: {
-    mode: 'blank',
+    mode: "blank",
     processName: 'Warenausgang München',
+    readOnly: false,
+    xml: "",
+    initialPhase: "editing"
   },
 }
 
