@@ -54,14 +54,17 @@ const BpmnEditor = React.forwardRef<BpmnEditorHandle, BpmnEditorProps>(
 
     useImperativeHandle(ref, () => ({
       undo() {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const cs = (instanceRef.current as BpmnModeler)?.get?.('commandStack') as any
         cs?.undo?.()
       },
       redo() {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const cs = (instanceRef.current as BpmnModeler)?.get?.('commandStack') as any
         cs?.redo?.()
       },
       zoomFit() {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const canvas = instanceRef.current?.get?.('canvas') as any
         canvas?.zoom?.('fit-viewport', 'auto')
       },
@@ -79,6 +82,7 @@ const BpmnEditor = React.forwardRef<BpmnEditorHandle, BpmnEditorProps>(
 
       instance.importXML(xml).then(({ warnings }) => {
         if (warnings?.length) console.warn('BpmnEditor: import warnings', warnings)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const canvas = instance.get('canvas') as any
         canvas.zoom('fit-viewport', 'auto')
       }).catch((err: Error) => {
@@ -86,6 +90,7 @@ const BpmnEditor = React.forwardRef<BpmnEditorHandle, BpmnEditorProps>(
       })
 
       if (!readOnly) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const eventBus = (instance as BpmnModeler).get('eventBus') as any
         eventBus.on('commandStack.changed', () => {
           if (debounceRef.current) clearTimeout(debounceRef.current)
