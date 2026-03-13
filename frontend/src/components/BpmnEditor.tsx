@@ -34,9 +34,10 @@ const BpmnEditor = React.forwardRef<BpmnEditorHandle, BpmnEditorProps>(
 
     async function saveAndNotify(instance: BpmnModeler | BpmnViewer) {
       try {
-        const { xml: savedXml, warnings } = await (instance as BpmnModeler).saveXML({ format: true })
-        if (warnings?.length) console.warn('BpmnEditor: saveXML warnings', warnings)
-        onXmlChangeRef.current?.(savedXml)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const result = await (instance as BpmnModeler).saveXML({ format: true }) as any
+        if (result.warnings?.length) console.warn('BpmnEditor: saveXML warnings', result.warnings)
+        if (result.xml) onXmlChangeRef.current?.(result.xml)
       } catch (e) {
         console.error('BpmnEditor: saveXML failed', e)
       }
