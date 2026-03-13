@@ -21,6 +21,36 @@ interface BpmnDiagramProps {
   onError?: (error: Error) => void;
   /** Additional CSS class */
   className?: string;
+  /** Shows the diagram toolbar with action buttons */
+  showToolbar?: boolean;
+}
+
+// yet-another-bpmn-auto-layout requires .outgoing/.incoming arrays on flow nodes,
+// but bpmn-moddle only sets them when the XML has explicit <bpmn:outgoing> child
+// elements. This function enriches the XML and runs auto-layout.
+async function applyAutoLayout(xml: string): Promise<string> {
+  const moddle = new BpmnModdle();
+  const { rootElement } = await moddle.fromXML(xml);
+  const processes: any[] = rootElement.get('rootElements').filter(
+    (el: any) => el.$type === 'bpmn:Process'
+  );
+  for (const process of processes) {
+    const flows: any[] = (process.get('flowElements') || []).filter(
+      (el: any) => el.$type === 'bpmn:SequenceFlow'
+    );
+    for (const flow of flows) {
+      if (flow.sourceRef) {
+        if (!flow.sourceRef.outgoing) flow.sourceRef.outgoing = [];
+        if (!flow.sourceRef.outgoing.includes(flow)) flow.sourceRef.outgoing.push(flow);
+      }
+      if (flow.targetRef) {
+        if (!flow.targetRef.incoming) flow.targetRef.incoming = [];
+        if (!flow.targetRef.incoming.includes(flow)) flow.targetRef.incoming.push(flow);
+      }
+    }
+  }
+  const { xml: enrichedXml } = await moddle.toXML(rootElement, { format: true });
+  return layoutProcess(enrichedXml);
 }
 
 const defaultBpmnXml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -66,16 +96,18 @@ export default function BpmnDiagram({
   onRender,
   onError,
   className,
+  showToolbar = false,
 }: BpmnDiagramProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<BpmnJS | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [processedXml, setProcessedXml] = useState<string | null>(null);
+  const [isLayouting, setIsLayouting] = useState(false);
 
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // Initialize BPMN viewer
     viewerRef.current = new BpmnJS({
       container: containerRef.current,
       width,
@@ -84,70 +116,37 @@ export default function BpmnDiagram({
 
     const viewer = viewerRef.current;
 
-    // Add event listeners
     if (onElementClick) {
       viewer.on('element.click', (event: any) => {
         onElementClick(event.element);
       });
     }
 
-    // Check if XML contains DI (diagram interchange) information
-    const hasDiInfo = (xmlString: string): boolean => {
-      return xmlString.includes('bpmndi:') || xmlString.includes('BPMNDiagram');
-    };
+    const hasDiInfo = (xmlString: string): boolean =>
+      xmlString.includes('bpmndi:') || xmlString.includes('BPMNDiagram');
 
-    // Import XML
     const importDiagram = async () => {
       try {
         setIsLoading(true);
         setError(null);
+        setProcessedXml(null);
 
-        // Auto-layout if the XML lacks DI information
-        let processedXml = xml;
+        let finalXml = xml;
         if (!hasDiInfo(xml)) {
           try {
-            // yet-another-bpmn-auto-layout requires .outgoing/.incoming arrays on
-            // flow nodes, but bpmn-moddle only sets them when the XML has explicit
-            // <bpmn:outgoing> child elements. Pre-process to add those from
-            // sourceRef/targetRef before running layout.
-            const moddle = new BpmnModdle();
-            const { rootElement } = await moddle.fromXML(xml);
-            const processes: any[] = rootElement.get('rootElements').filter(
-              (el: any) => el.$type === 'bpmn:Process'
-            );
-            for (const process of processes) {
-              const flows: any[] = (process.get('flowElements') || []).filter(
-                (el: any) => el.$type === 'bpmn:SequenceFlow'
-              );
-              for (const flow of flows) {
-                if (flow.sourceRef) {
-                  if (!flow.sourceRef.outgoing) flow.sourceRef.outgoing = [];
-                  if (!flow.sourceRef.outgoing.includes(flow)) flow.sourceRef.outgoing.push(flow);
-                }
-                if (flow.targetRef) {
-                  if (!flow.targetRef.incoming) flow.targetRef.incoming = [];
-                  if (!flow.targetRef.incoming.includes(flow)) flow.targetRef.incoming.push(flow);
-                }
-              }
-            }
-            const { xml: enrichedXml } = await moddle.toXML(rootElement, { format: true });
-            processedXml = await layoutProcess(enrichedXml);
+            finalXml = await applyAutoLayout(xml);
           } catch (layoutErr) {
             console.warn('Auto-layout failed, using original XML:', layoutErr);
-            processedXml = xml;
           }
         }
 
-        const { warnings } = await viewer.importXML(processedXml);
+        const { warnings } = await viewer.importXML(finalXml);
+        if (warnings.length) console.warn('BPMN Import warnings:', warnings);
 
-        if (warnings.length) {
-          console.warn('BPMN Import warnings:', warnings);
-        }
-
-        // Zoom to fit viewport
-        const canvas = viewer.get('canvas') as { zoom: (scale: string, alignment?: string) => void };
+        const canvas = viewer.get('canvas') as any;
         canvas.zoom('fit-viewport', 'auto');
 
+        setProcessedXml(finalXml);
         setIsLoading(false);
         onRender?.();
       } catch (err) {
@@ -155,19 +154,34 @@ export default function BpmnDiagram({
         console.error('BPMN Import error:', err);
         setError(errorMsg);
         setIsLoading(false);
-        if (err instanceof Error) {
-          onError?.(err);
-        }
+        if (err instanceof Error) onError?.(err);
       }
     };
 
     importDiagram();
 
-    // Cleanup
     return () => {
       viewer.destroy();
     };
   }, [xml, height, width, onElementClick, onRender, onError]);
+
+  const handleAutoLayout = async () => {
+    if (!viewerRef.current) return;
+    setIsLayouting(true);
+    try {
+      const result = await applyAutoLayout(processedXml ?? xml);
+      if (!viewerRef.current) return;
+      await viewerRef.current.importXML(result);
+      if (!viewerRef.current) return;
+      const canvas = viewerRef.current.get('canvas') as any;
+      canvas.zoom('fit-viewport', 'auto');
+      setProcessedXml(result);
+    } catch (err) {
+      console.warn('Auto-layout failed:', err);
+    } finally {
+      setIsLayouting(false);
+    }
+  };
 
   const containerStyle: React.CSSProperties = {
     width,
@@ -211,6 +225,42 @@ export default function BpmnDiagram({
         >
           <div style={{ fontWeight: 600, marginBottom: '8px' }}>Error loading diagram</div>
           <div style={{ fontSize: '12px', color: '#666' }}>{error}</div>
+        </div>
+      )}
+      {showToolbar && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '46px',
+            right: '12px',
+            zIndex: 10,
+            display: 'flex',
+            gap: '4px',
+            background: 'white',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            borderRadius: '6px',
+            padding: '4px',
+          }}
+        >
+          <button
+            onClick={handleAutoLayout}
+            disabled={isLayouting || isLoading}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              border: '1px solid #e0e0e0',
+              borderRadius: '4px',
+              background: isLayouting || isLoading ? '#f5f5f5' : 'white',
+              cursor: isLayouting || isLoading ? 'not-allowed' : 'pointer',
+              fontSize: '13px',
+              color: '#333',
+              fontFamily: 'system-ui, sans-serif',
+            }}
+          >
+            {isLayouting ? '⏳ Layouting…' : '↻ Auto Layout'}
+          </button>
         </div>
       )}
       <div
