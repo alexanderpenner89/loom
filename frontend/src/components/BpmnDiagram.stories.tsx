@@ -48,6 +48,10 @@ const meta = {
       action: 'error',
       description: 'Callback when import fails',
     },
+    showToolbar: {
+      control: 'boolean',
+      description: 'Zeigt die Diagram-Toolbar mit Aktions-Buttons (z.B. Auto Layout)',
+    },
   },
 } satisfies Meta<typeof BpmnDiagram>;
 
@@ -307,6 +311,116 @@ export const AutoLayoutApplied: Story = {
     docs: {
       description: {
         story: 'Dieses XML enthält keine Diagramm-Informationen (DI). Die Komponente erkennt dies automatisch und wendet yet-another-bpmn-auto-layout an, um ein gut strukturiertes Layout zu erzeugen.',
+      },
+    },
+  },
+};
+
+// BPMN XML mit absichtlich chaotischem Layout — Elemente an zufälligen Positionen
+const chaoticLayoutXml = `<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="Process_1" isExecutable="false">
+    <bpmn:startEvent id="StartEvent_1" name="Order Received"/>
+    <bpmn:task id="Task_1" name="Validate Order"/>
+    <bpmn:task id="Task_2" name="Check Inventory"/>
+    <bpmn:exclusiveGateway id="Gateway_1" name="In Stock?"/>
+    <bpmn:task id="Task_3" name="Process Payment"/>
+    <bpmn:task id="Task_4" name="Notify: Out of Stock"/>
+    <bpmn:task id="Task_5" name="Ship Order"/>
+    <bpmn:endEvent id="EndEvent_1" name="Order Complete"/>
+    <bpmn:endEvent id="EndEvent_2" name="Order Cancelled"/>
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Task_1"/>
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_1" targetRef="Task_2"/>
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_2" targetRef="Gateway_1"/>
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Gateway_1" targetRef="Task_3" name="Ja"/>
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Task_3" targetRef="Task_5"/>
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="Task_5" targetRef="EndEvent_1"/>
+    <bpmn:sequenceFlow id="Flow_7" sourceRef="Gateway_1" targetRef="Task_4" name="Nein"/>
+    <bpmn:sequenceFlow id="Flow_8" sourceRef="Task_4" targetRef="EndEvent_2"/>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Process_1">
+      <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
+        <dc:Bounds x="600" y="400" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_1_di" bpmnElement="Task_1">
+        <dc:Bounds x="50" y="50" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_2_di" bpmnElement="Task_2">
+        <dc:Bounds x="700" y="200" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_1_di" bpmnElement="Gateway_1" isMarkerVisible="true">
+        <dc:Bounds x="300" y="450" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_3_di" bpmnElement="Task_3">
+        <dc:Bounds x="500" y="80" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_4_di" bpmnElement="Task_4">
+        <dc:Bounds x="150" y="300" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_5_di" bpmnElement="Task_5">
+        <dc:Bounds x="80" y="480" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_1_di" bpmnElement="EndEvent_1">
+        <dc:Bounds x="750" y="500" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_2_di" bpmnElement="EndEvent_2">
+        <dc:Bounds x="400" y="150" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
+        <dc:waypoint x="636" y="418"/>
+        <dc:waypoint x="150" y="90"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
+        <dc:waypoint x="150" y="90"/>
+        <dc:waypoint x="750" y="240"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3">
+        <dc:waypoint x="750" y="240"/>
+        <dc:waypoint x="325" y="450"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4">
+        <dc:waypoint x="350" y="450"/>
+        <dc:waypoint x="550" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5">
+        <dc:waypoint x="550" y="160"/>
+        <dc:waypoint x="130" y="480"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_6_di" bpmnElement="Flow_6">
+        <dc:waypoint x="130" y="480"/>
+        <dc:waypoint x="768" y="500"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_7_di" bpmnElement="Flow_7">
+        <dc:waypoint x="300" y="475"/>
+        <dc:waypoint x="200" y="300"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_8_di" bpmnElement="Flow_8">
+        <dc:waypoint x="200" y="300"/>
+        <dc:waypoint x="418" y="150"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>`;
+
+/**
+ * Story mit Toolbar und chaotischem Ausgangslayout.
+ * Klicke "↻ Auto Layout" um das Diagramm automatisch neu anzuordnen.
+ */
+export const WithToolbar: Story = {
+  args: {
+    xml: chaoticLayoutXml,
+    height: '600px',
+    width: '1000px',
+    showToolbar: true,
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Das Diagramm hat ein chaotisches Layout. Klicke "↻ Auto Layout" in der Toolbar (unten rechts) um es automatisch neu anzuordnen.',
       },
     },
   },
