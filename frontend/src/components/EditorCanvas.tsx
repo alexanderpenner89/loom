@@ -54,11 +54,14 @@ export function EditorCanvas({
   async function handleGenerate() {
     if (!prompt.trim() || isGenerating) return
     setIsGenerating(true)
-    onGenerate?.(prompt)
-    await new Promise(r => setTimeout(r, 1200))
-    setCurrentXml(MOCK_GENERATED_XML)
-    setPhase('editing')
-    setIsGenerating(false)
+    try {
+      onGenerate?.(prompt)
+      await new Promise(r => setTimeout(r, 1200))
+      setCurrentXml(MOCK_GENERATED_XML)
+      setPhase('editing')
+    } finally {
+      setIsGenerating(false)
+    }
   }
 
   async function handleRelease() {
